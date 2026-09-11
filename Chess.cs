@@ -1,4 +1,9 @@
-﻿using System.Text;
+﻿/*
+    - File: Chess.cs
+    - Author: BjornBEs
+*/
+
+using System.Text;
 
 namespace BasisProgrammeringOpgave
 {
@@ -16,15 +21,46 @@ namespace BasisProgrammeringOpgave
         PieceTypeKing = 0b000_110_0,
         PieceTypeMask = 0b000_111_0,
     }
+    enum Command
+    {
+        None,
+        Move,
+        Print,
+        Retry,
+        Quit,
+        Restart,
+    }
     public static class Chess
     {
-        // ♖ ♘ ♗ ♕ ♔ ♙
+        /// <summary>
+        /// Is the user playing aginst an AI or another user
+        /// </summary>
+        static bool aginstAi = false;
+
+        /// <summary>
+        /// Use text based input (true) or use keybindings (false)
+        /// </summary>
+        static bool textBasedInput = true;
+
+        /// <summary>
+        /// The borad
+        /// </summary>
         static char[,] borad;
-        // bit field for pice info
+
+        /// <summary>
+        /// a bitfield for piece info bc we can't use objects... fuck!!!!!
+        /// </summary>
         static PieceInfo[,] boradInfo;
+
+        /// <summary>
+        /// Starts the chess game
+        /// </summary>
         public static void StartChessGame()
         {
+            // First start the output encoding to use UTF-8 so we can you unicode charaters
             Console.OutputEncoding = Encoding.UTF8;
+
+            // initializing the board and pieces
             borad = new char[8, 8]
             {
                 { '♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖' },
@@ -67,24 +103,102 @@ namespace BasisProgrammeringOpgave
             Console.WriteLine("This game can be played aginst vs an AI or vs another player");
             Console.WriteLine("Write 'AI' or 1 to fight aginst an AI");
             Console.WriteLine("Write 'Player' or 2 to fight aginst another player");
-            string input = Console.ReadLine();
 
-            bool aginst = false;
-            if (!int.TryParse(input, out int value))
+            while (true)
             {
+                string input = Console.ReadLine();
+
+                if (!int.TryParse(input, out int value))
+                {
+                    value = 0;
+                }
+
+                if (value == 1 || input.StartsWith("ai"))
+                {
+                    aginstAi = true;
+                    break;
+                }
+                else if (value == 2 || input.StartsWith("player"))
+                {
+                    aginstAi = false;
+                    break;
+                }
+                else
+                {
+                    continue;
+                }
             }
 
             while (true)
             {
                 PrintBoard();
 
-                GetInput();
+                string data = GetInput(out Command cmd);
             }
         }
 
-        static void GetInput()
+        static void GetInputPrintHelp()
         {
+            Console.WriteLine("Commands:");
+            Console.WriteLine("h - help menu");
+            Console.WriteLine("m - move a piece");
+            Console.WriteLine("p - print the board");
+            Console.WriteLine("s - switch input system");
+            Console.WriteLine("q - quit the game");
+            Console.WriteLine("r - restart the game");
+        }
 
+        static string GetInput(out Command cmd)
+        {
+            if (textBasedInput)
+            {
+                while (true)
+                {
+                    string command = Console.ReadLine();
+                    if (command.Length > 1)
+                    {
+                        Console.WriteLine("Invalid input try again");
+                        continue;
+                    }
+
+                    switch (command)
+                    {
+                        case "h":
+                            GetInputPrintHelp();
+                            continue;
+                        case "m":
+                            cmd = Command.Move;
+                            Console.Write("Move piece in Algebraic notation:");
+                            string piece = Console.ReadLine();
+                            if (char.IsLetter(piece, 0))
+                            {
+
+                            }
+                            return "";
+                        case "p":
+                            cmd = Command.Print;
+                            return "";
+                        case "s":
+                            cmd = Command.Retry;
+                            return "";
+                        case "q":
+                            cmd = Command.Quit;
+                            return "";
+                        case "r":
+                            cmd = Command.Restart;
+                            return "";
+                        default:
+                            Console.WriteLine("Invalid input try again");
+                            continue;
+                    }
+                }
+            }
+            else
+            {
+                // TODO:
+            }
+            cmd = Command.None;
+            return "";
         }
 
         static void PrintBoard()
