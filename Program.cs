@@ -1,4 +1,24 @@
-﻿namespace BasisProgrammeringOpgave;
+﻿/*
+ * File: Program.cs
+ * File Created: 11 Sep 2026
+ * Author: BjornBEs
+ * -----
+ * Last Modified: 11 Sep 2026
+ * Modified By: BjornBEs
+ * -----
+ */
+
+/*
+ * File: Program.cs
+ * File Created: 11 Sep 2026
+ * Author: BjornBEs
+ * -----
+ * Last Modified: 11 Sep 2026
+ * Modified By: BjornBEs
+ * -----
+ */
+
+namespace BasisProgrammeringOpgave;
 
 class Program
 {
@@ -59,10 +79,12 @@ class Program
 
     static void choiceOption1()
     {
+        SænkeSlagskib.Start();
     }
 
     static void choiceOption2()
     {
+        Minesweeper.Start();
     }
 
     static void choiceOption3()
@@ -72,12 +94,12 @@ class Program
 
     static void choiceHelp()
     {
-        Console.WriteLine("option1  - Will play the ");
-        Console.WriteLine("option2  - Will play the ");
-        Console.WriteLine("chess    - Will play chess");
-        Console.WriteLine("help     - Will show this text");
-        Console.WriteLine("credit   - Will show who was apart of this program");
-        Console.WriteLine("exit     - Will close the program");
+        Console.WriteLine("Sænke Slagskib   - Will play Sænke Slagskib");
+        Console.WriteLine("Minesweeper      - Will play Minesweeper");
+        Console.WriteLine("chess            - Will play chess");
+        Console.WriteLine("help             - Will show this text");
+        Console.WriteLine("credit           - Will show who was apart of this program");
+        Console.WriteLine("exit             - Will close the program");
     }
 
     static void choiceCredit()
@@ -111,7 +133,7 @@ class Program
         Console.ResetColor();
         Console.CursorVisible = false;
 
-        string[] options = { "option1", "option2", "option3", "help", "credit", "exit" };
+        string[] options = { "Sænke Slagskib", "Minesweeper", "chess", "help", "credit", "exit" };
         Action[] actions = { choiceOption1, choiceOption2, choiceOption3, choiceHelp, choiceCredit };
         while (true)
         {

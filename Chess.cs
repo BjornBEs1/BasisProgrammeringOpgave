@@ -1,7 +1,12 @@
 ﻿/*
-    - File: Chess.cs
-    - Author: BjornBEs
-*/
+ * File: Chess.cs
+ * File Created: 11 Sep 2026
+ * Author: BjornBEs
+ * -----
+ * Last Modified: 11 Sep 2026
+ * Modified By: BjornBEs
+ * -----
+ */
 
 using System.Text;
 
@@ -51,6 +56,8 @@ namespace BasisProgrammeringOpgave
         /// a bitfield for piece info bc we can't use objects... fuck!!!!!
         /// </summary>
         static PieceInfo[,] boradInfo;
+
+        static bool firstTime;
 
         /// <summary>
         /// Starts the chess game
@@ -128,6 +135,8 @@ namespace BasisProgrammeringOpgave
                     continue;
                 }
             }
+
+            Console.Clear();
 
             while (true)
             {
