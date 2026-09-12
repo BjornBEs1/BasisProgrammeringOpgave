@@ -49,7 +49,7 @@
                     {
                         int row = rnd.Next(0, 10); // Tilfældig række genereres for skibets placering
                         int col = rnd.Next(0, 10); // Tilfældig kolonne genereres for skibets placering
-                        bool horisontal = rnd.Next(0, 2) == 0; // Tilfældig retning for skibet (horisontal eller vertikal)         
+                        bool horisontal = rnd.Next(0, 2) == 0; // Tilfældig retning for skibet (vandret eller lodret)         
                     }                                                                                        
                 }
                 PrintBoard(computerboard);
