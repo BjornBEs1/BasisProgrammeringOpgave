@@ -27,13 +27,14 @@ class Program
     /// </summary>
     /// <param name="options">An array of options to choose</param>
     /// <param name="choice">The returning choice from options or String.Empty if the function returns -1</param>
-    /// <returns>The index in options that the choice</returns>
+    /// <returns>The index in options that the user choose</returns>
     static int OpenMenu(string[] options, out string choice)
     {
         int cursor = 0;
 
         while (true)
         {
+            // setting the cursor to 0, 0 so we don't have too clear the screen all the time
             Console.SetCursorPosition(0, 0);
             for (int i = 0; i < options.Length; i++)
             {
@@ -50,20 +51,24 @@ class Program
             ConsoleKeyInfo key = Console.ReadKey();
             if (key.Key == ConsoleKey.Escape)
             {
+                // check for exit
                 choice = String.Empty;
                 return -1;
             }
             else if (key.Key == ConsoleKey.Enter)
             {
+                // check for accept
                 choice = options[cursor];
                 return cursor;
             }
             else if (key.Key == ConsoleKey.UpArrow && cursor != 0)
             {
+                // limiting the cursor so that it can't go under 0
                 cursor--;
             }
             else if (key.Key == ConsoleKey.DownArrow && cursor < options.Length - 1)
             {
+                // limiting the cursor so that it can't go over options.Length
                 cursor++;
             }
         }
@@ -109,7 +114,8 @@ class Program
         {
             "BjornBEs - Made the menu",
             "BjornBEs - Made chess",
-            "@ BjornBEs - Made the menu2"
+            "Emil - Made minesweeper",
+            "Rasmus - Made Sænke Slagskib"
         };
 
         int middle = Console.BufferWidth / 2;
@@ -129,20 +135,44 @@ class Program
 
     static void Main(string[] args)
     {
+        // only for debugging here
+        // becurse vscode doesn't work
+        // FUCK YOU MICROSOFT AND WINDOWS FOR NOT GIVING LINUX VS IDE
+        if (args.Length > 0)
+        {
+            // check the command line's arguments for "chess"
+            if (args[0].Equals("chess"))
+            {
+                choiceOption3();
+                Environment.Exit(0);
+            }
+        }
+
+        // the 'normal' path
+
+        // resetting the console colors and contents
         Console.Clear();
         Console.ResetColor();
         Console.CursorVisible = false;
 
-        string[] options = { "Sænke Slagskib", "Minesweeper", "chess", "help", "credit", "exit" };
-        Action[] actions = { choiceOption1, choiceOption2, choiceOption3, choiceHelp, choiceCredit };
+        // options for menu and actions for those options
+        string[] options = { "Sænke Slagskib",  "Minesweeper",  "Chess",        "help",     "credit",       "exit" };
+        Action[] actions = { choiceOption1,     choiceOption2,  choiceOption3,  choiceHelp, choiceCredit };
+
         while (true)
         {
+            // a feature that i wanted to use from day 1, but i couldn't becurse of Denni.
+            // - BjornBEs
             int index = OpenMenu(options, out string choice);
+            
+            // if it is within the length of the actions array then use that
             if (index < actions.Length)
             {
                 Console.WriteLine();
                 actions[index]();
             }
+
+            // else it is most likely 'exit' but we need to check
 
             switch (choice)
             {
