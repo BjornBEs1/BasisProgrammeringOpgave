@@ -35,7 +35,7 @@
                 char[,] computerboard = new char[10, 10]; // Computerens bræt oprettes som et 10x10 gitter
                 for (int i = 0; i < 10; i++) // Ydre løkke , der går gennem hver række i computerens bræt
                 {
-                    for (int j = 0; j < 10; j++) // Indre løkke, der går gennem hver kolonne i computerens bræt
+                    for (int j = 0; j < 10; j++) // Indre løkke, der går gennem hver kolonne i computerens bræt 
                     { 
                       computerboard[i, j] = '0'; // Hvert fældt i computerens bræt sættes til 0 
                     }                       
