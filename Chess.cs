@@ -28,6 +28,8 @@ namespace BasisProgrammeringOpgave
         White = 0x0008,
         Black = 0x0010,
         FirstMove = 0x0020,
+        CanCastle = 0x0040,
+        CanEnPassant = 0x0080,
     }
     enum Command
     {
@@ -37,6 +39,26 @@ namespace BasisProgrammeringOpgave
         Retry,
         Quit,
         Restart,
+    }
+    enum Tile
+    {
+        None = 0x00,
+        A = 0x01,
+        B = 0x02,
+        C = 0x03,
+        D = 0x04,
+        E = 0x05,
+        F = 0x06,
+        G = 0x07,
+        H = 0x08,
+        _1 = 0x10,
+        _2 = 0x20,
+        _3 = 0x30,
+        _4 = 0x40,
+        _5 = 0x50,
+        _6 = 0x60,
+        _7 = 0x70,
+        _8 = 0x80,
     }
     public static class Chess
     {
@@ -62,6 +84,16 @@ namespace BasisProgrammeringOpgave
 
         static PieceInfo moveTurn;
 
+        /// <summary>
+        /// The current move number. Starts at 1 and increments after Black's move. A game on move 20 with White to play shows '20'.
+        /// </summary>
+        static int moveNumber = 1;
+
+        /// <summary>
+        /// Counts moves since the last pawn move or capture. Used to enforce the 50-move draw rule. Resets to 0 after any pawn move or capture.
+        /// </summary>
+        static int halfMoveClock = 0;
+
         const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
         /// <summary>
@@ -74,6 +106,8 @@ namespace BasisProgrammeringOpgave
 
             // initializing variables
             moveTurn = PieceInfo.White;
+            moveNumber = 1;
+            halfMoveClock = 0;
 
             // initializing the board and pieces
             board = new char[8, 8];
@@ -110,7 +144,7 @@ namespace BasisProgrammeringOpgave
             }
 
             Console.Clear();
-            loadPositionFromFen("5k2/2p5/8/1P6/8/8/8/R3K2R b - - 0 1");
+            loadPositionFromFen("5k2/2p5/8/1P6/8/4P1P1/3P3P/R1N1KN1R b KQ - 20 50");
 
             while (true)
             {
@@ -135,7 +169,7 @@ namespace BasisProgrammeringOpgave
                             // check if it is that "teams" turn
                             if (!piece.HasFlag(moveTurn))
                             {
-                                WriteLog("Can't move that piece. Try again");
+                                WriteLog("Can't move that piece (wrong color). Try again");
                                 continue;
                             }
                             if (piece == PieceInfo.None)
@@ -144,34 +178,60 @@ namespace BasisProgrammeringOpgave
                             }
                             // WriteLog($"moving {piece} from ({selectionX}, {selectionY})");
 
-                            bool didMove = false;
+                            bool canMove = false;
                             // get the piece type using the bitmask
                             PieceInfo pieceType = piece & PieceInfo.Mask;
                             switch (pieceType)
                             {
                                 case PieceInfo.Pawn:
                                     {
-                                        didMove = checkMovePawn(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                        canMove = checkMovePawn(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                        if (canMove)
+                                        {
+                                            halfMoveClock = -1;
+                                        }
                                     }
                                     break;
                                 case PieceInfo.Knight:
+                                    {
+                                        canMove = checkMoveKnight(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                    }
                                     break;
                                 case PieceInfo.Bishop:
+                                    {
+                                        canMove = checkMoveBishop(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                    }
                                     break;
                                 case PieceInfo.Rook:
+                                    {
+                                        canMove = checkMoveRook(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                    }
                                     break;
                                 case PieceInfo.Queen:
+                                    {
+                                        canMove = checkMoveQueen(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                    }
                                     break;
                                 case PieceInfo.King:
                                     {
-                                        didMove = checkMoveKing(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                        canMove = checkMoveKing(piece, selectionX, selectionY, ref movementX, ref movementY);
                                     }
                                     break;
                             }
 
-                            if (!didMove)
+                            if (!canMove)
                             {
-                                WriteLog("That move was illegal try again");
+                                WriteLog("That move was illegal. Try again");
+                                continue;
+                            }
+                            if (!tryGetPiece(movementX, movementY, out PieceInfo otherPiece))
+                            {
+                                WriteLog("That move was illegal (oob). try again");
+                                continue;
+                            }
+                            if (isPieceOnSameTeam(piece, otherPiece))
+                            {
+                                WriteLog("That move was illegal (same team). try again");
                                 continue;
                             }
 
@@ -179,12 +239,14 @@ namespace BasisProgrammeringOpgave
 
                             if (moveTurn == PieceInfo.Black)
                             {
+                                moveNumber++;
                                 moveTurn = PieceInfo.White;
                             }
                             else
                             {
                                 moveTurn = PieceInfo.Black;
                             }
+                            halfMoveClock++;
                             break;
                         }
                     case Command.Print:
@@ -222,6 +284,23 @@ namespace BasisProgrammeringOpgave
         static bool isPieceEmpty(PieceInfo targetPiece)
         {
             if ((targetPiece & PieceInfo.Mask) == PieceInfo.None)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Checks if the target piece is PieceInfo.None
+        /// </summary>
+        /// <returns>True is the piece is PieceInfo.None and False if not</returns>
+        static bool isPieceOnSameTeam(PieceInfo piece1, PieceInfo piece2)
+        {
+            if (piece2 == PieceInfo.None || piece1 == PieceInfo.None)
+            {
+                return false;
+            }
+            if (piece1.HasFlag(piece2 & (PieceInfo)0x0018))
             {
                 return true;
             }
@@ -341,45 +420,67 @@ namespace BasisProgrammeringOpgave
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="piece"></param>
+        /// <param name="piecePosX"></param>
+        /// <param name="piecePosY"></param>
+        /// <param name="movementX"></param>
+        /// <param name="movementY"></param>
+        /// <returns></returns>
         static bool checkMovePawn(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
         {
             getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
 
+            if (deltaX < 0)
+            {
+                deltaX *= -1;
+            }
+            if (deltaY < 0)
+            {
+                deltaY *= -1;
+            }
+
             // a pawn can move 2 tiles in it's first move
-            bool hasLongMove = pieceHasMoved(piece);
+            bool hasLongMove = !pieceHasMoved(piece);
 
-            if (deltaX > 1 || deltaX < -1)
+            if (deltaX > 1 && deltaY > 2)
             {
                 return false;
             }
 
-            if ((deltaY > 1 || deltaY < -1) && !hasLongMove)
+            if (deltaY > 1 && !hasLongMove)
             {
                 return false;
-            }
-
-            if ((deltaY > 2 || deltaY < -2) && hasLongMove)
-            {
-                return false;
-            }
-
-            if (deltaY == 2 && hasLongMove)
-            {
-                return true;
             }
 
             PieceInfo otherPiece;
+            if (deltaY == 2 && hasLongMove)
+            {
+                if (tryGetPiece(movementX + 1, movementY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn))
+                {
+                    boardInfo[movementY, movementX + 1] |= PieceInfo.CanEnPassant;
+                }
+                if (tryGetPiece(movementX - 1, movementY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn))
+                {
+                    boardInfo[movementY, movementX - 1] |= PieceInfo.CanEnPassant;
+                }
+                return true;
+            }
+
             if (deltaX != 0)
             {
                 if (tryGetPiece(movementX, piecePosY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn))
                 {
+                    boardInfo[piecePosY, piecePosX] &= ~PieceInfo.CanEnPassant;
                     boardInfo[piecePosY, movementX] = PieceInfo.None;
                     board[piecePosY, movementX] = ' ';
                     return true;
                 }
                 if (tryGetPiece(movementX, movementY, out otherPiece))
                 {
-                    if (isPiece(otherPiece, PieceInfo.None))
+                    if (isPieceEmpty(otherPiece))
                     {
                         return false;
                     }
@@ -389,7 +490,151 @@ namespace BasisProgrammeringOpgave
 
             return true;
         }
+        static bool checkMoveKnight(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
+        {
+            getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
 
+            if (deltaX < 0)
+            {
+                deltaX *= -1;
+            }
+            if (deltaY < 0)
+            {
+                deltaY *= -1;
+            }
+
+            // if the any delta are not 2 then they are invalid input
+            if (deltaX != 2 && deltaY != 2)
+            {
+                return false;
+            }
+
+            // if the any delta are not 1 then they are invalid input
+            if (deltaX != 1 && deltaY != 1)
+            {
+                return false;
+            }
+
+            return true;
+        }
+        static bool checkMoveBishop(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
+        {
+            getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
+
+            if (deltaX < 0)
+            {
+                deltaX *= -1;
+            }
+            if (deltaY < 0)
+            {
+                deltaY *= -1;
+            }
+
+            if ((deltaX == 0 && deltaY != 0) || (deltaX != 0 && deltaY == 0) || (deltaX != deltaY))
+            {
+                return false;
+            }
+
+            if (isClearInBetween(piecePosX, piecePosY, movementX, movementY, out int pieceX, out int pieceY))
+            {
+                if (tryGetPiece(pieceX, pieceY, out PieceInfo otherPiece))
+                {
+                    if (isPieceOnSameTeam(piece, otherPiece))
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        // movementX = pieceX;
+                        // movementY = pieceY;
+                        // return true;
+                        // could be made different but that ^ but... then this isn't chess compliant.
+                        // - BjornBEs 12:29 osdev joke.
+                        return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        static bool checkMoveRook(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
+        {
+            getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
+
+            if (deltaX != 0 && deltaY != 0)
+            {
+                return false;
+            }
+
+            if (isClearInBetween(piecePosX, piecePosY, movementX, movementY, out int pieceX, out int pieceY))
+            {
+                if (tryGetPiece(pieceX, pieceY, out PieceInfo otherPiece))
+                {
+                    if (isPieceOnSameTeam(piece, otherPiece))
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        // movementX = pieceX;
+                        // movementY = pieceY;
+                        // return true;
+                        // could be made different but that ^ but... then this isn't chess compliant.
+                        // - BjornBEs 12:29 osdev joke.
+                        return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        static bool checkMoveQueen(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
+        {
+            getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
+
+            if (deltaX < 0)
+            {
+                deltaX *= -1;
+            }
+            if (deltaY < 0)
+            {
+                deltaY *= -1;
+            }
+
+            if (deltaX != 0 && deltaY != 0 && Math.Abs(deltaX) != Math.Abs(deltaY))
+            {
+                return false;
+            }
+
+            if (isClearInBetween(piecePosX, piecePosY, movementX, movementY, out int pieceX, out int pieceY))
+            {
+                if (tryGetPiece(pieceX, pieceY, out PieceInfo otherPiece))
+                {
+                    if (isPieceOnSameTeam(piece, otherPiece))
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
         static bool checkMoveKing(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
         {
             getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
@@ -455,7 +700,6 @@ namespace BasisProgrammeringOpgave
                     WriteLog($"{rook} is not a rook or it has moved");
                 }
                 return false;
-                // TODO: Castle the king
             }
             if (pieceHasMoved(piece) && (deltaX > 1 || deltaX < -1))
             {
@@ -494,10 +738,20 @@ namespace BasisProgrammeringOpgave
         static void loadPositionFromFen(string fen)
         {
             // code taken from https://github.com/SebLague/Chess-Coding-Adventure/blob/Chess-V1-Unity/Assets/Scripts/Core/FenUtility.cs
-            string fenBoard = fen.Split(' ')[0];
+            string[] fenSegments = fen.Split(' ');
+            string fenBoard = fenSegments[0];
 
             int file = 0;
             int rank = 7;
+
+            if (fenSegments[1] == "w")
+            {
+                moveTurn = PieceInfo.White;
+            }
+            else if (fenSegments[1] == "b")
+            {
+                moveTurn = PieceInfo.Black;
+            }
 
             foreach (char symbol in fenBoard)
             {
@@ -521,6 +775,32 @@ namespace BasisProgrammeringOpgave
                         file++;
                     }
                 }
+            }
+
+            if (fenSegments[2].Contains("K"))
+            {
+                boardInfo[0, 7] |= PieceInfo.CanCastle;
+            }
+            if (fenSegments[2].Contains("Q"))
+            {
+                boardInfo[0, 0] |= PieceInfo.CanCastle;
+            }
+            if (fenSegments[2].Contains("k"))
+            {
+                boardInfo[7, 7] |= PieceInfo.CanCastle;
+            }
+            if (fenSegments[2].Contains("q"))
+            {
+                boardInfo[7, 0] |= PieceInfo.CanCastle;
+            }
+
+            if (fenSegments[4] != "-")
+            {
+                halfMoveClock = int.Parse(fenSegments[4]);
+            }
+            if (fenSegments[5] != "-")
+            {
+                moveNumber = int.Parse(fenSegments[5]);
             }
         }
 
@@ -631,6 +911,8 @@ namespace BasisProgrammeringOpgave
         static void PrintBoard()
         {
             Console.SetCursorPosition(0, 0);
+            Console.WriteLine($"number of turns {moveNumber} half {halfMoveClock}");
+            Console.WriteLine($"it is {moveTurn} turn now");
             for (int y = boardInfo.GetLength(0) - 1; y != -1; y--)
             {
                 Console.Write($"{y + 1} "); // Row label
@@ -670,6 +952,11 @@ namespace BasisProgrammeringOpgave
             }
             Console.WriteLine("   a  b  c  d  e  f  g  h"); // column labels
         }
+
+        //==========================================================
+        //             Debugging functions and variables            
+        //==========================================================
+
         static int logCursorX = 30;
         static int logCursorY = 0;
         static void WriteLog(string message)
