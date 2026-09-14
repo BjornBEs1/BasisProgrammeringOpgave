@@ -10,21 +10,24 @@
 
 using System.Text;
 
+// Reader discretion is advised there is a LOT of os deving tricks in here like Bit manipulation and math.
+
 namespace BasisProgrammeringOpgave
 {
     [Flags]
     enum PieceInfo : uint
     {
-        TeamWhite = 0b000_000_0,
-        TeamBlack = 0b000_000_1,
-        PieceTypeEmpty = 0b000_000_0,
-        PieceTypePawn = 0b000_001_0,
-        PieceTypeKnight = 0b000_010_0,
-        PieceTypeBishop = 0b000_011_0,
-        PieceTypeRook = 0b000_100_0,
-        PieceTypeQueen = 0b000_101_0,
-        PieceTypeKing = 0b000_110_0,
-        PieceTypeMask = 0b000_111_0,
+        None = 0x0000,
+        King = 0x0001,
+        Pawn = 0x0002,
+        Knight = 0x0003,
+        Bishop = 0x0004,
+        Rook = 0x0005,
+        Queen = 0x0006,
+        Mask = 0x0007,
+        White = 0x0008,
+        Black = 0x0010,
+        FirstMove = 0x0020,
     }
     enum Command
     {
@@ -38,9 +41,9 @@ namespace BasisProgrammeringOpgave
     public static class Chess
     {
         /// <summary>
-        /// Is the user playing aginst an AI or another user
+        /// Is the user playing against an AI or another user
         /// </summary>
-        static bool aginstAi = false;
+        static bool againstAi = false;
 
         /// <summary>
         /// Use text based input (true) or use keybindings (false)
@@ -48,68 +51,38 @@ namespace BasisProgrammeringOpgave
         static bool textBasedInput = true;
 
         /// <summary>
-        /// The borad
+        /// The board
         /// </summary>
-        static char[,] borad;
+        static char[,] board;
 
         /// <summary>
         /// a bitfield for piece info bc we can't use objects... fuck!!!!!
         /// </summary>
-        static PieceInfo[,] boradInfo;
+        static PieceInfo[,] boardInfo;
 
-        static bool firstTime;
+        static PieceInfo moveTurn;
+
+        const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
         /// <summary>
         /// Starts the chess game
         /// </summary>
         public static void StartChessGame()
         {
-            // First start the output encoding to use UTF-8 so we can you unicode charaters
+            // First start the output encoding to use UTF-8 so we can you unicode characters
             Console.OutputEncoding = Encoding.UTF8;
 
-            // initializing the board and pieces
-            borad = new char[8, 8]
-            {
-                { '♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖' },
-                { '♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙' },
-                { ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' },
-                { ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' },
-                { ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' },
-                { ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' },
-                { '♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙' },
-                { '♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖' },
-            };
-            boradInfo = new PieceInfo[8, 8]
-            {
-                { PieceInfo.PieceTypeRook, PieceInfo.PieceTypeKnight, PieceInfo.PieceTypeBishop, PieceInfo.PieceTypeQueen, PieceInfo.PieceTypeKing, PieceInfo.PieceTypeBishop, PieceInfo.PieceTypeKnight, PieceInfo.PieceTypeRook },
-                { PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn },
-                { PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty },
-                { PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty },
-                { PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty },
-                { PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty, PieceInfo.PieceTypeEmpty },
-                { PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn, PieceInfo.PieceTypePawn },
-                { PieceInfo.PieceTypeRook, PieceInfo.PieceTypeKnight, PieceInfo.PieceTypeBishop, PieceInfo.PieceTypeQueen, PieceInfo.PieceTypeKing, PieceInfo.PieceTypeBishop, PieceInfo.PieceTypeKnight, PieceInfo.PieceTypeRook },
-            };
+            // initializing variables
+            moveTurn = PieceInfo.White;
 
-            for (int y = 0; y < boradInfo.GetLength(0); y++)
-            {
-                for (int x = 0; x < boradInfo.GetLength(1); x++)
-                {
-                    if (y == 0 || y == 1)
-                    {
-                        boradInfo[y, x] |= PieceInfo.TeamBlack;
-                    }
-                    if (y == 6 || y == 7)
-                    {
-                        boradInfo[y, x] |= PieceInfo.TeamWhite;
-                    }
-                }
-            }
+            // initializing the board and pieces
+            board = new char[8, 8];
+            boardInfo = new PieceInfo[8, 8];
 
             Console.WriteLine("Welcome to 2d chess - by Bjorn");
-            Console.WriteLine("This game can be played aginst vs an AI or vs another player");
-            Console.WriteLine("Write 'AI' or 1 to fight aginst an AI");
-            Console.WriteLine("Write 'Player' or 2 to fight aginst another player");
+            Console.WriteLine("This game can be played against vs an AI or vs another player");
+            Console.WriteLine("Write 'AI' or 1 to fight against an AI");
+            Console.WriteLine("Write 'Player' or 2 to fight against another player");
 
             while (true)
             {
@@ -122,12 +95,12 @@ namespace BasisProgrammeringOpgave
 
                 if (value == 1 || input.StartsWith("ai"))
                 {
-                    aginstAi = true;
+                    againstAi = true;
                     break;
                 }
                 else if (value == 2 || input.StartsWith("player"))
                 {
-                    aginstAi = false;
+                    againstAi = false;
                     break;
                 }
                 else
@@ -137,14 +110,420 @@ namespace BasisProgrammeringOpgave
             }
 
             Console.Clear();
+            loadPositionFromFen("5k2/2p5/8/1P6/8/8/8/R3K2R b - - 0 1");
 
             while (true)
             {
                 PrintBoard();
 
                 string data = GetInput(out Command cmd);
+
+                switch (cmd)
+                {
+                    case Command.Move:
+                        {
+                            string[] selections = data.Split('|')[0].Split(',');
+                            string[] movements = data.Split('|')[1].Split(',');
+
+                            int selectionX = int.Parse(selections[0]);
+                            int selectionY = int.Parse(selections[1]);
+                            int movementX = int.Parse(movements[0]);
+                            int movementY = int.Parse(movements[1]);
+
+                            PieceInfo piece = boardInfo[selectionY, selectionX];
+
+                            // check if it is that "teams" turn
+                            if (!piece.HasFlag(moveTurn))
+                            {
+                                WriteLog("Can't move that piece. Try again");
+                                continue;
+                            }
+                            if (piece == PieceInfo.None)
+                            {
+                                WriteLog("Can't move none. Try again");
+                            }
+                            // WriteLog($"moving {piece} from ({selectionX}, {selectionY})");
+
+                            bool didMove = false;
+                            // get the piece type using the bitmask
+                            PieceInfo pieceType = piece & PieceInfo.Mask;
+                            switch (pieceType)
+                            {
+                                case PieceInfo.Pawn:
+                                    {
+                                        didMove = checkMovePawn(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                    }
+                                    break;
+                                case PieceInfo.Knight:
+                                    break;
+                                case PieceInfo.Bishop:
+                                    break;
+                                case PieceInfo.Rook:
+                                    break;
+                                case PieceInfo.Queen:
+                                    break;
+                                case PieceInfo.King:
+                                    {
+                                        didMove = checkMoveKing(piece, selectionX, selectionY, ref movementX, ref movementY);
+                                    }
+                                    break;
+                            }
+
+                            if (!didMove)
+                            {
+                                WriteLog("That move was illegal try again");
+                                continue;
+                            }
+
+                            movePiece(selectionX, selectionY, movementX, movementY);
+
+                            if (moveTurn == PieceInfo.Black)
+                            {
+                                moveTurn = PieceInfo.White;
+                            }
+                            else
+                            {
+                                moveTurn = PieceInfo.Black;
+                            }
+                            break;
+                        }
+                    case Command.Print:
+                        PrintBoard();
+                        break;
+                    case Command.Retry:
+                        break;
+                    case Command.Quit:
+                        break;
+                    case Command.Restart:
+                        break;
+                    default:
+                        break;
+                }
             }
         }
+
+        static bool pieceHasMoved(PieceInfo targetPiece)
+        {
+            return !targetPiece.HasFlag(PieceInfo.FirstMove);
+        }
+        static bool isPiece(PieceInfo targetPiece, PieceInfo info)
+        {
+            if ((targetPiece & PieceInfo.Mask) == info)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Checks if the target piece is PieceInfo.None
+        /// </summary>
+        /// <returns>True is the piece is PieceInfo.None and False if not</returns>
+        static bool isPieceEmpty(PieceInfo targetPiece)
+        {
+            if ((targetPiece & PieceInfo.Mask) == PieceInfo.None)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Will try to get a piece at the given coord
+        /// </summary>
+        /// <param name="x">The X coord of the target</param>
+        /// <param name="y">The Y coord of the target</param>
+        /// <param name="pieceInfo">The piece at that coord</param>
+        /// <returns>True if it isn't out of bounds, False if the given coords are out of bounds</returns>
+        static bool tryGetPiece(int x, int y, out PieceInfo pieceInfo)
+        {
+            pieceInfo = PieceInfo.None;
+            if (y < 0 || y >= board.GetLength(0))
+            {
+                return false;
+            }
+            if (x < 0 || x >= board.GetLength(1))
+            {
+                return false;
+            }
+
+            pieceInfo = boardInfo[y, x];
+            return true;
+        }
+
+        /// <summary>
+        /// checks if any pieces are in between (originX, originY) and (targetX, targetY) 
+        /// * this function was made with the help of copilot.
+        /// </summary>
+        /// <param name="originX">The X coord of the origin point</param>
+        /// <param name="originY">The Y coord of the origin point</param>
+        /// <param name="targetX">The X coord of the target point</param>
+        /// <param name="targetY">The Y coord of the target point</param>
+        /// <param name="pieceX">If this is non 0 that means at that X coord is there a piece</param>
+        /// <param name="pieceY">If this is non 0 that means at that Y coord is there a piece</param>
+        /// <returns>true if nothing is obstructing the line, false is there is a piece that is obstructing</returns>
+        static bool isClearInBetween(int originX, int originY, int targetX, int targetY, out int pieceX, out int pieceY)
+        {
+            int deltaX = targetX - originX;
+            int deltaY = targetY - originY;
+
+            int stepX = 0;
+            if (deltaX != 0)
+            {
+                stepX = Math.Abs(deltaX) / Math.Abs(deltaX);
+                if (deltaX < 0)
+                {
+                    stepX = -stepX;
+                }
+            }
+            int stepY = 0;
+            if (deltaY != 0)
+            {
+                stepY = Math.Abs(deltaY) / Math.Abs(deltaY);
+                if (deltaY < 0)
+                {
+                    stepY = -stepY;
+                }
+            }
+
+            if (deltaX != 0 && deltaY != 0 && Math.Abs(deltaX) != Math.Abs(deltaY))
+            {
+                pieceX = 0;
+                pieceY = 0;
+                return false;
+            }
+
+            int x = originX + stepX;
+            int y = originY + stepY;
+
+            while (x != targetX || y != targetY)
+            {
+                if (tryGetPiece(x, y, out PieceInfo piece) && !isPieceEmpty(piece))
+                {
+                    pieceX = x;
+                    pieceY = y;
+                    return true;
+                }
+                x += stepX;
+                y += stepY;
+            }
+            pieceX = 0;
+            pieceY = 0;
+            return false;
+        }
+
+        static void movePiece(int fromX, int fromY, int toX, int toY)
+        {
+            WriteLog($"moving {board[fromY, fromX]} ({boardInfo[fromY, fromX]})/({fromX},{fromY}) to {board[toY, toX]} ({boardInfo[toY, toX]})/({toX},{toY})");
+
+            // OS dev trick/bit level trick here
+            // ~0x0010 = 0xFFEF
+            // 0x0010 & 0xFFEF = 0x0000
+            // yes that is true here we unset (zero) the PieceInfo.PieceDataFirstMove bit becurse you have moved that piece.
+            boardInfo[fromY, fromX] &= ~PieceInfo.FirstMove;
+
+            board[toY, toX] = board[fromY, fromX];
+            board[fromY, fromX] = ' ';
+
+            boardInfo[toY, toX] = boardInfo[fromY, fromX];
+            boardInfo[fromY, fromX] = PieceInfo.None;
+        }
+
+        static void getDelta(int piecePosX, int piecePosY, int movementX, int movementY, out int deltaX, out int deltaY)
+        {
+            deltaX = piecePosX - movementX;
+            deltaY = piecePosY - movementY;
+
+            if (moveTurn.HasFlag(PieceInfo.Black))
+            {
+                deltaY = -deltaY;
+                deltaX = -deltaX;
+            }
+        }
+
+        static bool checkMovePawn(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
+        {
+            getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
+
+            // a pawn can move 2 tiles in it's first move
+            bool hasLongMove = pieceHasMoved(piece);
+
+            if (deltaX > 1 || deltaX < -1)
+            {
+                return false;
+            }
+
+            if ((deltaY > 1 || deltaY < -1) && !hasLongMove)
+            {
+                return false;
+            }
+
+            if ((deltaY > 2 || deltaY < -2) && hasLongMove)
+            {
+                return false;
+            }
+
+            if (deltaY == 2 && hasLongMove)
+            {
+                return true;
+            }
+
+            PieceInfo otherPiece;
+            if (deltaX != 0)
+            {
+                if (tryGetPiece(movementX, piecePosY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn))
+                {
+                    boardInfo[piecePosY, movementX] = PieceInfo.None;
+                    board[piecePosY, movementX] = ' ';
+                    return true;
+                }
+                if (tryGetPiece(movementX, movementY, out otherPiece))
+                {
+                    if (isPiece(otherPiece, PieceInfo.None))
+                    {
+                        return false;
+                    }
+                    return true;
+                }
+            }
+
+            return true;
+        }
+
+        static bool checkMoveKing(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
+        {
+            getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
+
+            if (deltaY > 1 || deltaY < -1)
+            {
+                return false;
+            }
+
+            int kingY = 0;
+            if (moveTurn == PieceInfo.Black)
+            {
+                kingY = 7;
+            }
+
+            if (!pieceHasMoved(piece) && (deltaX > 1 || deltaX < -1) && kingY == movementY)
+            {
+                PieceInfo rook;
+                int rookPosX = 0;
+                int castlePosX = 0;
+                int castleRookPosX = 0;
+                if (deltaX < 0)
+                {
+                    if (tryGetPiece(7, movementY, out rook))
+                    {
+                        rookPosX = 7;
+                        castlePosX = 6;
+                        castleRookPosX = 5;
+                    }
+                    if (isPieceEmpty(rook))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    if (tryGetPiece(0, movementY, out rook))
+                    {
+                        rookPosX = 0;
+                        castlePosX = 2;
+                        castleRookPosX = 3;
+                    }
+                    if (isPieceEmpty(rook))
+                    {
+                        return false;
+                    }
+                }
+                if (isPiece(rook, PieceInfo.Rook) && !pieceHasMoved(rook))
+                {
+                    if (!isClearInBetween(4, kingY, rookPosX, movementY, out int x, out int y))
+                    {
+                        movePiece(rookPosX, kingY, castleRookPosX, kingY);
+                        movementX = castlePosX;
+                        return true;
+                    }
+                    else
+                    {
+                        WriteLog($"something is at {x},{y} which is {boardInfo[y, x]}");
+                    }
+                }
+                else
+                {
+                    WriteLog($"{rook} is not a rook or it has moved");
+                }
+                return false;
+                // TODO: Castle the king
+            }
+            if (pieceHasMoved(piece) && (deltaX > 1 || deltaX < -1))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        static PieceInfo pieceTypeFromSymbol(char symbol, out char boardSymbol)
+        {
+            switch (symbol)
+            {
+                case 'r':
+                    boardSymbol = '♖';
+                    return PieceInfo.Rook;
+                case 'n':
+                    boardSymbol = '♘';
+                    return PieceInfo.Knight;
+                case 'b':
+                    boardSymbol = '♗';
+                    return PieceInfo.Bishop;
+                case 'q':
+                    boardSymbol = '♕';
+                    return PieceInfo.Queen;
+                case 'k':
+                    boardSymbol = '♔';
+                    return PieceInfo.King;
+                case 'p':
+                    boardSymbol = '♙';
+                    return PieceInfo.Pawn;
+            }
+            boardSymbol = ' ';
+            return PieceInfo.None;
+        }
+        static void loadPositionFromFen(string fen)
+        {
+            // code taken from https://github.com/SebLague/Chess-Coding-Adventure/blob/Chess-V1-Unity/Assets/Scripts/Core/FenUtility.cs
+            string fenBoard = fen.Split(' ')[0];
+
+            int file = 0;
+            int rank = 7;
+
+            foreach (char symbol in fenBoard)
+            {
+                if (symbol == '/')
+                {
+                    file = 0;
+                    rank--;
+                }
+                else
+                {
+                    if (char.IsDigit(symbol))
+                    {
+                        file += (int)char.GetNumericValue(symbol);
+                    }
+                    else
+                    {
+                        PieceInfo pieceColor = char.IsUpper(symbol) ? PieceInfo.White : PieceInfo.Black;
+                        PieceInfo pieceType = pieceTypeFromSymbol(char.ToLower(symbol), out char pieceChar);
+                        boardInfo[rank, file] = pieceColor | pieceType | PieceInfo.FirstMove;
+                        board[rank, file] = pieceChar;
+                        file++;
+                    }
+                }
+            }
+        }
+
 
         static void GetInputPrintHelp()
         {
@@ -155,6 +534,12 @@ namespace BasisProgrammeringOpgave
             Console.WriteLine("s - switch input system");
             Console.WriteLine("q - quit the game");
             Console.WriteLine("r - restart the game");
+            int inputCursorY = Console.CursorTop;
+            for (int i = 0; i < 10; i++)
+            {
+                Console.WriteLine("".PadLeft(Console.WindowWidth - 1));
+            }
+            Console.SetCursorPosition(0, inputCursorY);
         }
 
         static string GetInput(out Command cmd)
@@ -163,6 +548,7 @@ namespace BasisProgrammeringOpgave
             {
                 while (true)
                 {
+                    GetInputPrintHelp();
                     string command = Console.ReadLine();
                     if (command.Length > 1)
                     {
@@ -176,14 +562,46 @@ namespace BasisProgrammeringOpgave
                             GetInputPrintHelp();
                             continue;
                         case "m":
-                            cmd = Command.Move;
-                            Console.Write("Move piece in Algebraic notation:");
-                            string piece = Console.ReadLine();
-                            if (char.IsLetter(piece, 0))
                             {
+                                cmd = Command.Move;
+                                Console.Write("Select a piece in Algebraic notation:");
+                                string piece = Console.ReadLine().ToUpper();
+                                string selection = "";
+                                if (piece.Length == 0)
+                                {
+                                    cmd = Command.Retry;
+                                    return "";
+                                }
+                                if (char.IsLetter(piece, 0) && char.IsDigit(piece, 1))
+                                {
+                                    // represents the rows a through h as an index 0 through 7
+                                    int row = piece[0] - 'A';
 
+                                    // represents the columns 1 through 8 as an index 0 through 7
+                                    int col = piece[1] - '1';
+
+                                    selection = $"{row},{col}";
+                                }
+                                Console.Write("Where should that piece move to in Algebraic notation:");
+                                piece = Console.ReadLine().ToUpper();
+                                if (piece.Length == 0)
+                                {
+                                    cmd = Command.Retry;
+                                    return "";
+                                }
+                                if (char.IsLetter(piece, 0) && char.IsDigit(piece, 1))
+                                {
+                                    // represents the rows a through h as an index 0 through 7
+                                    int row = piece[0] - 'A';
+
+                                    // represents the columns 1 through 8 as an index 0 through 7
+                                    int col = piece[1] - '1';
+
+                                    cmd = Command.Move;
+                                    return selection + $"|{row},{col}";
+                                }
+                                return "";
                             }
-                            return "";
                         case "p":
                             cmd = Command.Print;
                             return "";
@@ -213,31 +631,55 @@ namespace BasisProgrammeringOpgave
         static void PrintBoard()
         {
             Console.SetCursorPosition(0, 0);
-            for (int y = 0; y < boradInfo.GetLength(0); y++)
+            for (int y = boardInfo.GetLength(0) - 1; y != -1; y--)
             {
                 Console.Write($"{y + 1} "); // Row label
 
-                for (int x = 0; x < boradInfo.GetLength(1); x++)
+                for (int x = 0; x < boardInfo.GetLength(1); x++)
                 {
                     if ((x + y) % 2 == 1) // black background for uneven, white for even.
                     {
-                        Console.BackgroundColor = ConsoleColor.White;
-                        Console.ForegroundColor = ConsoleColor.Black;
-                    }
-                    PieceInfo piece = boradInfo[y, x];
-                    if ((piece & PieceInfo.PieceTypeMask) == PieceInfo.PieceTypeEmpty)
-                    {
-                        Console.Write("  ");
+                        Console.BackgroundColor = ConsoleColor.DarkRed;
                     }
                     else
                     {
-                        Console.Write(borad[y, x] + " ");
+                        Console.BackgroundColor = ConsoleColor.Yellow;
+                    }
+                    PieceInfo piece = boardInfo[y, x];
+
+                    if (piece.HasFlag(PieceInfo.Black))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Black;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.White;
+                    }
+
+                    if ((piece & PieceInfo.Mask) == PieceInfo.None)
+                    {
+                        Console.Write("   ");
+                    }
+                    else
+                    {
+                        Console.Write(" " + board[y, x] + " ");
                     }
                     Console.ResetColor();
                 }
                 Console.WriteLine();
             }
-            Console.WriteLine("  a b c d e f g h"); // column labels
+            Console.WriteLine("   a  b  c  d  e  f  g  h"); // column labels
+        }
+        static int logCursorX = 30;
+        static int logCursorY = 0;
+        static void WriteLog(string message)
+        {
+            int oldCursorX = Console.CursorLeft;
+            int oldCursorY = Console.CursorTop;
+            Console.SetCursorPosition(logCursorX, logCursorY);
+            Console.WriteLine(message);
+            logCursorY = Console.CursorTop % 30;
+            Console.SetCursorPosition(oldCursorX, oldCursorY);
         }
     }
 }
