@@ -8,6 +8,8 @@ namespace BasisProgrammeringOpgave
 {
     public static class Minesweeper
     {
+        static char[,] BoardArray;
+        static char[,] BombeArray;
         public static void Start()
         {
             //The player is first presented with question = name
@@ -43,13 +45,12 @@ namespace BasisProgrammeringOpgave
 
 
 
-
         public static void StartGame()
         {
 
             Console.Clear();
-            char[,] BoardArray = new char[10, 10];
-            char[,] BombeArray = new char[10, 10];
+            BoardArray = new char[10, 10];
+            BombeArray = new char[10, 10];
             //Fyld board med "?"
             for (int y = 0; y < BoardArray.GetLength(0); y++)
             {
@@ -59,22 +60,15 @@ namespace BasisProgrammeringOpgave
                 }
             }
             //Kalder funktionen MinePlacering for at sætte "Rnd" bomber
-            MinePlacering(BombeArray);
-
-            for (int y = 0; y < BoardArray.GetLength(0); y++)
-            {
-                for (int x = 0; x < BoardArray.GetLength(1); x++)
-                {
-                    Console.Write(BoardArray[y, x] + " ");
-                }
-                Console.WriteLine();
-            }
-            Console.ReadLine();
-            BrugerInput(BombeArray);
+            MinePlacering();
+            int bombeTæller = 0;
+            BrugerInput();
         }
 
 
-        public static void MinePlacering(char[,] BombeArray)
+
+
+        public static void MinePlacering()
         {
             Random rnd = new Random();
             for (int i = 0; i < 10; i++)
@@ -86,19 +80,47 @@ namespace BasisProgrammeringOpgave
                 BombeArray[y, x] = '*';
 
             }
+            
         }
 
-        public static void BrugerInput(char[,] BombeArray)
+
+
+
+        public static void BrugerInput()
         {
             while (true)
             {
+                Console.Clear();
+                int y = 0;
+                int x = 0;
+                for (y = 0; y < BoardArray.GetLength(0); y++)
+                {
+                    Console.Write($"{y+1}".PadRight(4));
+                    for (x = 0; x < BoardArray.GetLength(1); x++)
+                    {
+                        Console.Write(BoardArray[y, x] + " ");
+                    }
+                    Console.WriteLine();
+                }
                 Console.Write("X: ");
-                int x = Convert.ToInt32(Console.ReadLine());
+                string userInputX = Console.ReadLine();
+                if (!int.TryParse(userInputX, out x))
+                {
+                    Console.WriteLine("Invalid Input For X Cordinates");
+                    continue;
+                }
+
 
                 Console.Write("Y: ");
-                int y = Convert.ToInt32(Console.ReadLine());
+                string userInputY = Console.ReadLine();
+                if (!int.TryParse(userInputY, out y))
+                {
+                    Console.WriteLine("Invalid Input For Y Cordinates");
+                    continue;
+                }
 
-
+                x -= 1;
+                y -= 1;
                 if (BombeArray[y, x] == '*')
                 {
                     Console.Clear();
@@ -110,7 +132,7 @@ namespace BasisProgrammeringOpgave
                     if (svar == ("ja"))
                     {
                         Console.Clear();
-                      Start();
+                        Start();
                         Console.Clear();
                     }
                     else
@@ -118,21 +140,18 @@ namespace BasisProgrammeringOpgave
                         if (svar == ("nej"))
                             break;
                     }
-
-
-
-                    
-                    break;
                 }
                 else
                 {
                     {
+                        BoardArray[y, x] = ('O');
                         Console.WriteLine("Sikker");
                     }
                 }
 
             }
         }
+
     }
 }
 
