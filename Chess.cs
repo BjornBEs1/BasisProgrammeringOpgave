@@ -9,6 +9,7 @@
  */
 
 using System.Text;
+using static System.Collections.Specialized.BitVector32;
 
 // Reader discretion is advised there is a LOT of os deving tricks in here like Bit manipulation and math.
 
@@ -40,6 +41,7 @@ namespace BasisProgrammeringOpgave
         Quit,
         Restart,
     }
+    [Flags]
     enum Tile
     {
         None = 0x00,
@@ -99,6 +101,12 @@ namespace BasisProgrammeringOpgave
         /// </summary>
         static int halfMoveClock = 0;
 
+        static int cursorX = 0;
+        static int cursorY = 0;
+
+        static Tile selectTile;
+        static bool tileSelected;
+
         const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
         /// <summary>
@@ -108,6 +116,7 @@ namespace BasisProgrammeringOpgave
         {
             initializeGame();
             startChessGame();
+            Console.Clear();
         }
 
         static void initializeGame()
@@ -158,6 +167,11 @@ namespace BasisProgrammeringOpgave
             loadPositionFromFen(/*"5k2/2p5/8/1P6/8/4P1P1/3P3P/R1N1KN1R b KQ - 20 50"*/ StartFEN);
         }
 
+        /// <summary>
+        /// Enters the main game loop. Continues until <see cref="isPlaying"/> is false.
+        /// The loop prints the board, reads and parses user input, validates and executes moves,
+        /// and handles high-level commands like quit, restart and retry.
+        /// </summary>
         static void startChessGame()
         {
             isPlaying = true;
@@ -264,14 +278,13 @@ namespace BasisProgrammeringOpgave
                             halfMoveClock++;
                             break;
                         }
-                    case Command.Print:
-                        continue;
                     case Command.Retry:
                         break;
                     case Command.Quit:
                         isPlaying = false;
                         break;
                     case Command.Restart:
+                        initializeGame();
                         break;
                     default:
                         break;
@@ -279,10 +292,24 @@ namespace BasisProgrammeringOpgave
             }
         }
 
+        /// <summary>
+        /// Returns true when the provided <paramref name="targetPiece"/> has previously moved.
+        /// The implementation relies on the <see cref="PieceInfo.FirstMove"/> flag being set for pieces that have not moved yet.
+        /// </summary>
+        /// <param name="targetPiece">Piece info flags to inspect.</param>
+        /// <returns>True if the piece has moved at least once; otherwise false.</returns>
         static bool pieceHasMoved(PieceInfo targetPiece)
         {
             return !targetPiece.HasFlag(PieceInfo.FirstMove);
         }
+
+        /// <summary>
+        /// Checks whether the masked piece type of <paramref name="targetPiece"/> equals <paramref name="info"/>.
+        /// Uses the <see cref="PieceInfo.Mask"/> to isolate the piece type bits.
+        /// </summary>
+        /// <param name="targetPiece">The piece flags to inspect (may include color and other flags).</param>
+        /// <param name="info">The piece type to compare against (e.g., <see cref="PieceInfo.Pawn"/>).</param>
+        /// <returns>True if the types match; otherwise false.</returns>
         static bool isPiece(PieceInfo targetPiece, PieceInfo info)
         {
             if ((targetPiece & PieceInfo.Mask) == info)
@@ -293,9 +320,10 @@ namespace BasisProgrammeringOpgave
         }
 
         /// <summary>
-        /// Checks if the target piece is PieceInfo.None
+        /// Checks whether the target piece is empty (no piece present).
         /// </summary>
-        /// <returns>True is the piece is PieceInfo.None and False if not</returns>
+        /// <param name="targetPiece">Piece info flags to inspect.</param>
+        /// <returns>True if the masked piece type equals <see cref="PieceInfo.None"/>; otherwise false.</returns>
         static bool isPieceEmpty(PieceInfo targetPiece)
         {
             if ((targetPiece & PieceInfo.Mask) == PieceInfo.None)
@@ -306,16 +334,20 @@ namespace BasisProgrammeringOpgave
         }
 
         /// <summary>
-        /// Checks if the target piece is PieceInfo.None
+        /// Determines whether two pieces belong to the same team (color).
+        /// Returns false if either piece is <see cref="PieceInfo.None"/>.
         /// </summary>
-        /// <returns>True is the piece is PieceInfo.None and False if not</returns>
+        /// <param name="piece1">First piece's flags.</param>
+        /// <param name="piece2">Second piece's flags.</param>
+        /// <returns>True if both pieces are on the same team; otherwise false.</returns>
         static bool isPieceOnSameTeam(PieceInfo piece1, PieceInfo piece2)
         {
             if (piece2 == PieceInfo.None || piece1 == PieceInfo.None)
             {
                 return false;
             }
-            if (piece1.HasFlag(piece2 & (PieceInfo)0x0018))
+            // mask with 0x18 which is PieceInfo.White and PieceInfo.Black
+            if (piece1.HasFlag(piece2 & PieceInfo.White | PieceInfo.Black))
             {
                 return true;
             }
@@ -323,12 +355,12 @@ namespace BasisProgrammeringOpgave
         }
 
         /// <summary>
-        /// Will try to get a piece at the given coord
+        /// Attempts to get the <see cref="PieceInfo"/> at the given board coordinate.
         /// </summary>
-        /// <param name="x">The X coord of the target</param>
-        /// <param name="y">The Y coord of the target</param>
-        /// <param name="pieceInfo">The piece at that coord</param>
-        /// <returns>True if it isn't out of bounds, False if the given coords are out of bounds</returns>
+        /// <param name="x">Column index (0..7).</param>
+        /// <param name="y">Row index (0..7).</param>
+        /// <param name="pieceInfo">When successful, receives the piece info at the coordinate; otherwise <see cref="PieceInfo.None"/>.</param>
+        /// <returns>True if the coordinates are inside board bounds; otherwise false.</returns>
         static bool tryGetPiece(int x, int y, out PieceInfo pieceInfo)
         {
             pieceInfo = PieceInfo.None;
@@ -346,16 +378,20 @@ namespace BasisProgrammeringOpgave
         }
 
         /// <summary>
-        /// checks if any pieces are in between (originX, originY) and (targetX, targetY) 
-        /// * this function was made with the help of copilot.
+        /// Checks whether the straight line between two squares is unobstructed (exclusive).
+        /// This supports rook/bishop/queen movement checks. The function verifies that
+        /// the movement is linear (straight or diagonal) and then walks the path checking for pieces.
         /// </summary>
-        /// <param name="originX">The X coord of the origin point</param>
-        /// <param name="originY">The Y coord of the origin point</param>
-        /// <param name="targetX">The X coord of the target point</param>
-        /// <param name="targetY">The Y coord of the target point</param>
-        /// <param name="pieceX">If this is non 0 that means at that X coord is there a piece</param>
-        /// <param name="pieceY">If this is non 0 that means at that Y coord is there a piece</param>
-        /// <returns>true if nothing is obstructing the line, false is there is a piece that is obstructing</returns>
+        /// <param name="originX">Origin X coordinate.</param>
+        /// <param name="originY">Origin Y coordinate.</param>
+        /// <param name="targetX">Target X coordinate.</param>
+        /// <param name="targetY">Target Y coordinate.</param>
+        /// <param name="pieceX">If an obstruction is found, set to the obstructing piece X; otherwise 0.</param>
+        /// <param name="pieceY">If an obstruction is found, set to the obstructing piece Y; otherwise 0.</param>
+        /// <returns>
+        /// True if an obstructing piece was found between origin and target (exclusive) and <paramref name="pieceX"/>/<paramref name="pieceY"/> contain its coordinates;
+        /// False if there is no obstruction or the movement is not linear (invalid for this check).
+        /// </returns>
         static bool isClearInBetween(int originX, int originY, int targetX, int targetY, out int pieceX, out int pieceY)
         {
             int deltaX = targetX - originX;
@@ -406,6 +442,14 @@ namespace BasisProgrammeringOpgave
             return false;
         }
 
+        /// <summary>
+        /// Moves a piece on the board from one square to another, updating both the display board and the piece info bitfield.
+        /// Also clears the source square and unsets the <see cref="PieceInfo.FirstMove"/> flag on the moved piece.
+        /// </summary>
+        /// <param name="fromX">Source X coordinate.</param>
+        /// <param name="fromY">Source Y coordinate.</param>
+        /// <param name="toX">Destination X coordinate.</param>
+        /// <param name="toY">Destination Y coordinate.</param>
         static void movePiece(int fromX, int fromY, int toX, int toY)
         {
             WriteLog($"moving {board[fromY, fromX]} ({boardInfo[fromY, fromX]})/({fromX},{fromY}) to {board[toY, toX]} ({boardInfo[toY, toX]})/({toX},{toY})");
@@ -414,6 +458,7 @@ namespace BasisProgrammeringOpgave
             // ~0x0010 = 0xFFEF
             // 0x0010 & 0xFFEF = 0x0000
             // yes that is true here we unset (zero) the PieceInfo.PieceDataFirstMove bit becurse you have moved that piece.
+            // shit is happening
             boardInfo[fromY, fromX] &= ~PieceInfo.FirstMove;
 
             board[toY, toX] = board[fromY, fromX];
@@ -423,6 +468,16 @@ namespace BasisProgrammeringOpgave
             boardInfo[fromY, fromX] = PieceInfo.None;
         }
 
+        /// <summary>
+        /// Computes the delta between a piece's position and a target movement, and flips the sign depending on current move turn.
+        /// For Black's turn the deltas are inverted so that movement logic can be evaluated from a white-perspective.
+        /// </summary>
+        /// <param name="piecePosX">Piece X coordinate.</param>
+        /// <param name="piecePosY">Piece Y coordinate.</param>
+        /// <param name="movementX">Target X coordinate.</param>
+        /// <param name="movementY">Target Y coordinate.</param>
+        /// <param name="deltaX">Computed delta X (piecePosX - movementX), possibly inverted for Black.</param>
+        /// <param name="deltaY">Computed delta Y (piecePosY - movementY), possibly inverted for Black.</param>
         static void getDelta(int piecePosX, int piecePosY, int movementX, int movementY, out int deltaX, out int deltaY)
         {
             deltaX = piecePosX - movementX;
@@ -436,14 +491,16 @@ namespace BasisProgrammeringOpgave
         }
 
         /// <summary>
-        /// 
+        /// Validates pawn movement rules, including single and double advances, captures and en-passant handling.
+        /// The function may modify <paramref name="movementX"/> and <paramref name="movementY"/> to reflect legal target coordinates
+        /// and updates en-passant flags on neighboring pawns when a two-square advance is performed.
         /// </summary>
-        /// <param name="piece"></param>
-        /// <param name="piecePosX"></param>
-        /// <param name="piecePosY"></param>
-        /// <param name="movementX"></param>
-        /// <param name="movementY"></param>
-        /// <returns></returns>
+        /// <param name="piece">The pawn's flags (including color and move state).</param>
+        /// <param name="piecePosX">Pawn current X coordinate.</param>
+        /// <param name="piecePosY">Pawn current Y coordinate.</param>
+        /// <param name="movementX">Requested destination X coordinate (passed by ref).</param>
+        /// <param name="movementY">Requested destination Y coordinate (passed by ref).</param>
+        /// <returns>True if the requested pawn move is legal; otherwise false.</returns>
         static bool checkMovePawn(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
         {
             getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
@@ -505,6 +562,16 @@ namespace BasisProgrammeringOpgave
 
             return true;
         }
+
+        /// <summary>
+        /// Validates knight movement: must be an L-shape (2 by 1).
+        /// </summary>
+        /// <param name="piece">The knight's flags.</param>
+        /// <param name="piecePosX">Knight current X coordinate.</param>
+        /// <param name="piecePosY">Knight current Y coordinate.</param>
+        /// <param name="movementX">Requested destination X coordinate (passed by ref).</param>
+        /// <param name="movementY">Requested destination Y coordinate (passed by ref).</param>
+        /// <returns>True if the requested knight move is legal; otherwise false.</returns>
         static bool checkMoveKnight(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
         {
             getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
@@ -532,6 +599,16 @@ namespace BasisProgrammeringOpgave
 
             return true;
         }
+
+        /// <summary>
+        /// Validates bishop movement: must move strictly diagonally and the path must be unobstructed.
+        /// </summary>
+        /// <param name="piece">The bishop's flags.</param>
+        /// <param name="piecePosX">Bishop current X coordinate.</param>
+        /// <param name="piecePosY">Bishop current Y coordinate.</param>
+        /// <param name="movementX">Requested destination X coordinate (passed by ref).</param>
+        /// <param name="movementY">Requested destination Y coordinate (passed by ref).</param>
+        /// <returns>True if the requested bishop move is legal; otherwise false.</returns>
         static bool checkMoveBishop(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
         {
             getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
@@ -650,6 +727,22 @@ namespace BasisProgrammeringOpgave
 
             return true;
         }
+
+        /// <summary>
+        /// Validates king movement including normal single-square moves and castling.
+        /// - Normal moves: allow deltaX and deltaY in range [-1, 1].
+        /// - Castling: if the king has not moved and attempts a multi-square horizontal move on its back rank,
+        ///   the function verifies the rook, clear path and rook's first-move state, then performs the rook move
+        ///   and adjusts <paramref name="movementX"/> to the castled king destination.
+        /// </summary>
+        /// <param name="piece">The king's <see cref="PieceInfo"/> flags.</param>
+        /// <param name="piecePosX">Current king X coordinate.</param>
+        /// <param name="piecePosY">Current king Y coordinate.</param>
+        /// <param name="movementX">Requested destination X coordinate (passed by ref; may be modified for castling).</param>
+        /// <param name="movementY">Requested destination Y coordinate (passed by ref).</param>
+        /// <returns>
+        /// True if the requested move is legal (including successful castling adjustments); otherwise false.
+        /// </returns>
         static bool checkMoveKing(PieceInfo piece, int piecePosX, int piecePosY, ref int movementX, ref int movementY)
         {
             getDelta(piecePosX, piecePosY, movementX, movementY, out int deltaX, out int deltaY);
@@ -723,7 +816,12 @@ namespace BasisProgrammeringOpgave
 
             return true;
         }
-
+        /// <summary>
+        /// Maps a single-character FEN piece symbol (lowercase) to its <see cref="PieceInfo"/> type and a display character.
+        /// </summary>
+        /// <param name="symbol">Lowercase piece symbol (e.g. 'r','n','b','q','k','p').</param>
+        /// <param name="boardSymbol">Output display character used on the console board.</param>
+        /// <returns>The corresponding <see cref="PieceInfo"/> piece type, or <see cref="PieceInfo.None"/> for unknown symbols.</returns>
         static PieceInfo pieceTypeFromSymbol(char symbol, out char boardSymbol)
         {
             switch (symbol)
@@ -750,6 +848,12 @@ namespace BasisProgrammeringOpgave
             boardSymbol = ' ';
             return PieceInfo.None;
         }
+        /// <summary>
+        /// Loads a board position from a FEN string.
+        /// - Parses piece placement, active color, castling rights and move counters.
+        /// - Sets piece characters on <see cref="board"/> and flags in <see cref="boardInfo"/>.
+        /// </summary>
+        /// <param name="fen">FEN string describing the position.</param>
         static void loadPositionFromFen(string fen)
         {
             // code taken from https://github.com/SebLague/Chess-Coding-Adventure/blob/Chess-V1-Unity/Assets/Scripts/Core/FenUtility.cs
@@ -819,7 +923,9 @@ namespace BasisProgrammeringOpgave
             }
         }
 
-
+        /// <summary>
+        /// Prints the available text-based input commands to the console and clears the input area below the help.
+        /// </summary>
         static void GetInputPrintHelp()
         {
             Console.WriteLine("Commands:");
@@ -837,6 +943,16 @@ namespace BasisProgrammeringOpgave
             Console.SetCursorPosition(0, inputCursorY);
         }
 
+        /// <summary>
+        /// Reads user input based on the current input mode (<see cref="textBasedInput"/>).
+        /// Supports the text-based command set:
+        /// - 'h' show help, 'm' move piece (prompts for algebraic squares), 'p' print board,
+        /// - 's' switch input, 'q' quit, 'r' restart.
+        /// </summary>
+        /// <param name="cmd">Out parameter that receives the parsed <see cref="Command"/>.</param>
+        /// <returns>
+        /// For moves, returns a string formatted as "selX,selY|dstX,dstY". For other commands returns an empty string.
+        /// </returns>
         static string GetInput(out Command cmd)
         {
             if (textBasedInput)
@@ -901,6 +1017,8 @@ namespace BasisProgrammeringOpgave
                             cmd = Command.Print;
                             return "";
                         case "s":
+                            Console.Clear();
+                            textBasedInput = false;
                             cmd = Command.Retry;
                             return "";
                         case "q":
@@ -917,12 +1035,88 @@ namespace BasisProgrammeringOpgave
             }
             else
             {
-                // TODO:
+                ConsoleKeyInfo key = Console.ReadKey();
+
+                if (key.Key == ConsoleKey.DownArrow)
+                {
+                    if (cursorY == 0)
+                    {
+                        cursorY = board.GetLength(0) - 1;
+                    }
+                    else
+                    {
+                        cursorY--;
+                    }
+                }
+                if (key.Key == ConsoleKey.UpArrow)
+                {
+                    if (cursorY == board.GetLength(0) - 1)
+                    {
+                        cursorY = 0;
+                    }
+                    else
+                    {
+                        cursorY++;
+                    }
+                }
+                if (key.Key == ConsoleKey.LeftArrow)
+                {
+                    if (cursorX == 0)
+                    {
+                        cursorX = board.GetLength(1) - 1;
+                    }
+                    else
+                    {
+                        cursorX--;
+                    }
+                }
+                if (key.Key == ConsoleKey.RightArrow)
+                {
+                    if (cursorX == board.GetLength(1) - 1)
+                    {
+                        cursorX = 0;
+                    }
+                    else
+                    {
+                        cursorX++;
+                    }
+                }
+                if (key.Key == ConsoleKey.Escape)
+                {
+                    if (tileSelected == true)
+                    {
+                        tileSelected = false;
+                        cmd = Command.None;
+                        return "";
+                    }
+                    cmd = Command.Quit;
+                    return "";
+                }
+                if (key.Key == ConsoleKey.Enter)
+                {
+                    if (tileSelected == false)
+                    {
+                        selectTile = (Tile)(cursorX) | (Tile)((cursorY) << 4);
+                        tileSelected = true;
+                    }
+                    else
+                    {
+                        cmd = Command.Move;
+                        int selectionX = (int)selectTile & 0x0F;
+                        int selectionY = ((int)selectTile >> 4) & 0x0F;
+                        tileSelected = false;
+                        return $"{selectionX},{selectionY}|{cursorX},{cursorY}";
+                    }
+                }
             }
             cmd = Command.None;
             return "";
         }
 
+        /// <summary>
+        /// Renders the current board state to the console including turn/move counters and coordinate labels.
+        /// Uses background/foreground colors to visually separate squares and piece colors.
+        /// </summary>
         static void PrintBoard()
         {
             Console.SetCursorPosition(0, 0);
@@ -955,11 +1149,32 @@ namespace BasisProgrammeringOpgave
 
                     if ((piece & PieceInfo.Mask) == PieceInfo.None)
                     {
-                        Console.Write("   ");
+                        if (textBasedInput == false && x == cursorX && y == cursorY)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Black;
+                            Console.Write("[ ]");
+                        }
+                        else
+                        {
+                            Console.Write("   ");
+                        }
                     }
                     else
                     {
-                        Console.Write(" " + board[y, x] + " ");
+                        if (textBasedInput == false && x == cursorX && y == cursorY)
+                        {
+                            ConsoleColor save = Console.ForegroundColor;
+                            Console.ForegroundColor = ConsoleColor.Black;
+                            Console.Write($"[");
+                            Console.ForegroundColor = save;
+                            Console.Write($"{board[y, x]}");
+                            Console.ForegroundColor = ConsoleColor.Black;
+                            Console.Write($"]");
+                        }
+                        else
+                        {
+                            Console.Write(" " + board[y, x] + " ");
+                        }
                     }
                     Console.ResetColor();
                 }
@@ -974,6 +1189,7 @@ namespace BasisProgrammeringOpgave
 
         static int logCursorX = 30;
         static int logCursorY = 0;
+
         static void WriteLog(string message)
         {
             int oldCursorX = Console.CursorLeft;
