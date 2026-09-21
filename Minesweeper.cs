@@ -51,7 +51,7 @@ namespace BasisProgrammeringOpgave
             Console.Clear();
             BoardArray = new char[10, 10];
             BombeArray = new char[10, 10];
-            //Fyld board med "?"
+            //Fills the board with "?"
             for (int y = 0; y < BoardArray.GetLength(0); y++)
             {
                 for (int x = 0; x < BoardArray.GetLength(1); x++)
@@ -59,7 +59,7 @@ namespace BasisProgrammeringOpgave
                     BoardArray[y, x] = '?';
                 }
             }
-            //Kalder funktionen MinePlacering for at sætte "Rnd" bomber
+            //Calls upon the funktion named MinePlacering to insert "Rnd" bombs
             MinePlacering();
             int bombeTæller = 0;
             BrugerInput();
@@ -70,6 +70,7 @@ namespace BasisProgrammeringOpgave
 
         public static void MinePlacering()
         {
+            //here the 10 randoms bombs is generated
             Random rnd = new Random();
             for (int i = 0; i < 10; i++)
             {
@@ -88,11 +89,13 @@ namespace BasisProgrammeringOpgave
 
         public static void BrugerInput()
         {
+            //Here we start a while loop 
             while (true)
             {
                 Console.Clear();
                 int y = 0;
                 int x = 0;
+               // Here the second board is made that will be used for bombs
                 for (y = 0; y < BoardArray.GetLength(0); y++)
                 {
                     Console.Write($"{y+1}".PadRight(4));
@@ -102,6 +105,7 @@ namespace BasisProgrammeringOpgave
                     }
                     Console.WriteLine();
                 }
+                //This will make sure you cant write anything but a legal number
                 Console.Write("X: ");
                 string userInputX = Console.ReadLine();
                 if (!int.TryParse(userInputX, out x))
@@ -110,7 +114,7 @@ namespace BasisProgrammeringOpgave
                     continue;
                 }
 
-
+                //This will make sure you cant write anything but a legal number
                 Console.Write("Y: ");
                 string userInputY = Console.ReadLine();
                 if (!int.TryParse(userInputY, out y))
@@ -121,6 +125,7 @@ namespace BasisProgrammeringOpgave
 
                 x -= 1;
                 y -= 1;
+                //Here is all the text and option that revel itself if you hit a bomb.
                 if (BombeArray[y, x] == '*')
                 {
                     Console.Clear();
@@ -148,15 +153,27 @@ namespace BasisProgrammeringOpgave
                         Console.WriteLine("Sikker");
                     }
                 }
+                //Here the bombs arround the selected point is reveled 
+                int bombeTæller = 0;
+
+               // Here the BombArray on the left revels itself if there are bombs located
+                if (BombeArray[y - 1, x - 1] == '*') bombeTæller++;
+                if (BombeArray[y - 1, x] == '*') bombeTæller++;
+                if (BombeArray[y - 1, x + 1] == '*') bombeTæller++;
+
+                // Here the BombArray on the top and buttom revels itself if there are bombs located
+                if (BombeArray[y, x - 1] == '*') bombeTæller++;
+                if (BombeArray[y, x + 1] == '*') bombeTæller++;
+
+                // Here the BombArray on the right revels itself if there are bombs located
+                if (BombeArray[y + 1, x - 1] == '*') bombeTæller++;
+                if (BombeArray[y + 1, x] == '*') bombeTæller++;
+                if (BombeArray[y + 1, x + 1] == '*') bombeTæller++;
+
+                BoardArray[y, x] = bombeTæller.ToString()[0];
 
             }
         }
 
     }
 }
-
-
-
-
-
-
