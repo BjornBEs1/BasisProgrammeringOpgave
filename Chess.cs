@@ -63,6 +63,11 @@ namespace BasisProgrammeringOpgave
     public static class Chess
     {
         /// <summary>
+        /// Indicates that the game is being played.
+        /// </summary>
+        static bool isPlaying = false;
+
+        /// <summary>
         /// Is the user playing against an AI or another user
         /// </summary>
         static bool againstAi = false;
@@ -99,7 +104,13 @@ namespace BasisProgrammeringOpgave
         /// <summary>
         /// Starts the chess game
         /// </summary>
-        public static void StartChessGame()
+        public static void Start()
+        {
+            initializeGame();
+            startChessGame();
+        }
+
+        static void initializeGame()
         {
             // First start the output encoding to use UTF-8 so we can you unicode characters
             Console.OutputEncoding = Encoding.UTF8;
@@ -124,7 +135,7 @@ namespace BasisProgrammeringOpgave
 
                 if (!int.TryParse(input, out int value))
                 {
-                    value = 0;
+                    continue;
                 }
 
                 if (value == 1 || input.StartsWith("ai"))
@@ -144,9 +155,13 @@ namespace BasisProgrammeringOpgave
             }
 
             Console.Clear();
-            loadPositionFromFen("5k2/2p5/8/1P6/8/4P1P1/3P3P/R1N1KN1R b KQ - 20 50");
+            loadPositionFromFen(/*"5k2/2p5/8/1P6/8/4P1P1/3P3P/R1N1KN1R b KQ - 20 50"*/ StartFEN);
+        }
 
-            while (true)
+        static void startChessGame()
+        {
+            isPlaying = true;
+            while (isPlaying)
             {
                 PrintBoard();
 
@@ -250,11 +265,11 @@ namespace BasisProgrammeringOpgave
                             break;
                         }
                     case Command.Print:
-                        PrintBoard();
-                        break;
+                        continue;
                     case Command.Retry:
                         break;
                     case Command.Quit:
+                        isPlaying = false;
                         break;
                     case Command.Restart:
                         break;
@@ -815,7 +830,7 @@ namespace BasisProgrammeringOpgave
             Console.WriteLine("q - quit the game");
             Console.WriteLine("r - restart the game");
             int inputCursorY = Console.CursorTop;
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < Console.WindowHeight - inputCursorY - 1; i++)
             {
                 Console.WriteLine("".PadLeft(Console.WindowWidth - 1));
             }
@@ -925,7 +940,7 @@ namespace BasisProgrammeringOpgave
                     }
                     else
                     {
-                        Console.BackgroundColor = ConsoleColor.Yellow;
+                        Console.BackgroundColor = ConsoleColor.DarkYellow;
                     }
                     PieceInfo piece = boardInfo[y, x];
 

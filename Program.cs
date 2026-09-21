@@ -8,16 +8,6 @@
  * -----
  */
 
-/*
- * File: Program.cs
- * File Created: 11 Sep 2026
- * Author: BjornBEs
- * -----
- * Last Modified: 11 Sep 2026
- * Modified By: BjornBEs
- * -----
- */
-
 namespace BasisProgrammeringOpgave;
 
 class Program
@@ -36,6 +26,7 @@ class Program
         {
             // setting the cursor to 0, 0 so we don't have too clear the screen all the time
             Console.SetCursorPosition(0, 0);
+            Console.WriteLine("Use the Up and Down arrows to move the cursor and select using enter");
             for (int i = 0; i < options.Length; i++)
             {
                 if (i == cursor)
@@ -94,7 +85,7 @@ class Program
 
     static void choiceOption3()
     {
-        Chess.StartChessGame();
+        Chess.Start();
     }
 
     static void choiceHelp()
