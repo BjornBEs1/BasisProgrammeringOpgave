@@ -155,6 +155,11 @@ class Program
             // a feature that i wanted to use from day 1, but i couldn't becurse of Denni.
             // - BjornBEs
             int index = OpenMenu(options, out string choice);
+
+            if (index == -1)
+            {
+                continue;
+            }
             
             // if it is within the length of the actions array then use that
             if (index < actions.Length)

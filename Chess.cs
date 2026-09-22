@@ -9,7 +9,6 @@
  */
 
 using System.Text;
-using static System.Collections.Specialized.BitVector32;
 
 // Reader discretion is advised there is a LOT of os deving tricks in here like Bit manipulation and math.
 
@@ -31,6 +30,8 @@ namespace BasisProgrammeringOpgave
         FirstMove = 0x0020,
         CanCastle = 0x0040,
         CanEnPassant = 0x0080,
+        CanPromote = 0x0100,
+        HasMovedFirst = 0x0200,
     }
     enum Command
     {
@@ -264,7 +265,33 @@ namespace BasisProgrammeringOpgave
                                 continue;
                             }
 
-                            movePiece(selectionX, selectionY, movementX, movementY);
+                            if (isPiece(piece, PieceInfo.Pawn))
+                            {
+                                piece = boardInfo[movementY, movementX];
+                                if (piece.HasFlag(PieceInfo.CanPromote))
+                                {
+                                    boardInfo[movementY, movementX] = DoPromote(piece, movementX, movementY, out char c);
+                                    board[movementY, movementX] = c;
+                                }
+                                else
+                                {
+                                    movePiece(selectionX, selectionY, movementX, movementY);
+                                }
+                            }
+                            else
+                            {
+                                movePiece(selectionX, selectionY, movementX, movementY);
+                            }
+
+                            for (int y = 0; y < boardInfo.GetLength(0); y++)
+                            {
+                                for (int x = 0; x < boardInfo.GetLength(1); x++)
+                                {
+                                    boardInfo[selectionY, selectionX] &= ~PieceInfo.HasMovedFirst;
+                                }
+                            }
+
+                            boardInfo[movementY, movementX] |= PieceInfo.HasMovedFirst;
 
                             if (moveTurn == PieceInfo.Black)
                             {
@@ -527,14 +554,21 @@ namespace BasisProgrammeringOpgave
                 return false;
             }
 
+            if (movementY == 0 || movementY == 7)
+            {
+                movePiece(piecePosX, piecePosY, movementX, movementY);
+                boardInfo[movementY, movementX] |= PieceInfo.CanPromote;
+                return true;
+            }
+
             PieceInfo otherPiece;
             if (deltaY == 2 && hasLongMove)
             {
-                if (tryGetPiece(movementX + 1, movementY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn))
+                if (tryGetPiece(movementX + 1, movementY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn) && otherPiece.HasFlag(PieceInfo.HasMovedFirst))
                 {
                     boardInfo[movementY, movementX + 1] |= PieceInfo.CanEnPassant;
                 }
-                if (tryGetPiece(movementX - 1, movementY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn))
+                if (tryGetPiece(movementX - 1, movementY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn) && otherPiece.HasFlag(PieceInfo.HasMovedFirst))
                 {
                     boardInfo[movementY, movementX - 1] |= PieceInfo.CanEnPassant;
                 }
@@ -543,7 +577,7 @@ namespace BasisProgrammeringOpgave
 
             if (deltaX != 0)
             {
-                if (tryGetPiece(movementX, piecePosY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn))
+                if (tryGetPiece(movementX, piecePosY, out otherPiece) && isPiece(otherPiece, PieceInfo.Pawn) && piece.HasFlag(PieceInfo.CanEnPassant) && otherPiece.HasFlag(PieceInfo.HasMovedFirst))
                 {
                     boardInfo[piecePosY, piecePosX] &= ~PieceInfo.CanEnPassant;
                     boardInfo[piecePosY, movementX] = PieceInfo.None;
@@ -561,6 +595,41 @@ namespace BasisProgrammeringOpgave
             }
 
             return true;
+        }
+
+        static PieceInfo DoPromote(PieceInfo piece, int piecePosX, int piecePosY, out char pieceChar)
+        {
+            WriteLog($"Promote your pawn at {piecePosY}, {piecePosX}");
+            WriteLog($"1: Queen");
+            WriteLog($"2: Rook");
+            WriteLog($"3: Knight");
+            WriteLog($"4: Bishop");
+            while (true)
+            {
+                string input = Console.ReadLine();
+                if (!int.TryParse(input, out int type) || type > 4)
+                {
+                    WriteLog("Wrong and or invaild input");
+                    continue;
+                }
+
+                switch (type)
+                {
+                    case 1:
+                        pieceChar = '♕';
+                        return PieceInfo.Queen | (piece & ~PieceInfo.Mask);
+                    case 2:
+                        pieceChar = '♖';
+                        return PieceInfo.Rook | (piece & ~PieceInfo.Mask);
+                    case 3:
+                        pieceChar = '♘';
+                        return PieceInfo.Knight | (piece & ~PieceInfo.Mask);
+                    case 4:
+                        pieceChar = '♗';
+                        return PieceInfo.Bishop | (piece & ~PieceInfo.Mask);
+                }
+                WriteLog("Wrong input/answer");
+            }
         }
 
         /// <summary>
@@ -1035,6 +1104,15 @@ namespace BasisProgrammeringOpgave
             }
             else
             {
+                Console.WriteLine("Use the Arrow key to move the cursor");
+                if (tileSelected == false)
+                {
+                    Console.WriteLine("Select a piece using Enter");
+                }
+                else
+                {
+                    Console.WriteLine("Move the piece using Enter");
+                }
                 ConsoleKeyInfo key = Console.ReadKey();
 
                 if (key.Key == ConsoleKey.DownArrow)
@@ -1101,10 +1179,15 @@ namespace BasisProgrammeringOpgave
                     }
                     else
                     {
-                        cmd = Command.Move;
                         int selectionX = (int)selectTile & 0x0F;
                         int selectionY = ((int)selectTile >> 4) & 0x0F;
                         tileSelected = false;
+                        if (selectionX == cursorX && selectionY == cursorY)
+                        {
+                            cmd = Command.None;
+                            return "";
+                        }
+                        cmd = Command.Move;
                         return $"{selectionX},{selectionY}|{cursorX},{cursorY}";
                     }
                 }
@@ -1147,6 +1230,9 @@ namespace BasisProgrammeringOpgave
                         Console.ForegroundColor = ConsoleColor.White;
                     }
 
+                    int selectionX = (int)selectTile & 0x0F;
+                    int selectionY = ((int)selectTile >> 4) & 0x0F;
+
                     if ((piece & PieceInfo.Mask) == PieceInfo.None)
                     {
                         if (textBasedInput == false && x == cursorX && y == cursorY)
@@ -1156,7 +1242,14 @@ namespace BasisProgrammeringOpgave
                         }
                         else
                         {
-                            Console.Write("   ");
+                            if (x == selectionX && y == selectionY && tileSelected)
+                            {
+                                Console.Write("[ ]");
+                            }
+                            else
+                            {
+                                Console.Write("   ");
+                            }
                         }
                     }
                     else
@@ -1173,7 +1266,20 @@ namespace BasisProgrammeringOpgave
                         }
                         else
                         {
-                            Console.Write(" " + board[y, x] + " ");
+                            if (x == selectionX && y == selectionY && tileSelected)
+                            {
+                                ConsoleColor save = Console.ForegroundColor;
+                                Console.ForegroundColor = ConsoleColor.Black;
+                                Console.Write($"[");
+                                Console.ForegroundColor = save;
+                                Console.Write($"{board[y, x]}");
+                                Console.ForegroundColor = ConsoleColor.Black;
+                                Console.Write($"]");
+                            }
+                            else
+                            {
+                                Console.Write(" " + board[y, x] + " ");
+                            }
                         }
                     }
                     Console.ResetColor();
@@ -1181,6 +1287,13 @@ namespace BasisProgrammeringOpgave
                 Console.WriteLine();
             }
             Console.WriteLine("   a  b  c  d  e  f  g  h"); // column labels
+
+            int inputCursorY = Console.CursorTop;
+            for (int i = 0; i < Console.WindowHeight - inputCursorY - 1; i++)
+            {
+                Console.WriteLine("".PadLeft(Console.WindowWidth - 1));
+            }
+            Console.SetCursorPosition(0, inputCursorY);
         }
 
         //==========================================================
@@ -1194,9 +1307,17 @@ namespace BasisProgrammeringOpgave
         {
             int oldCursorX = Console.CursorLeft;
             int oldCursorY = Console.CursorTop;
+            
             Console.SetCursorPosition(logCursorX, logCursorY);
+            if (logCursorY % 10 == 0)
+            {
+                logCursorY = 0;
+                Console.Clear();
+                Console.SetCursorPosition(logCursorX, logCursorY);
+            }
+
             Console.WriteLine(message);
-            logCursorY = Console.CursorTop % 30;
+            logCursorY = Console.CursorTop;
             Console.SetCursorPosition(oldCursorX, oldCursorY);
         }
     }
